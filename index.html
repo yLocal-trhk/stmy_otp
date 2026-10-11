@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スタマイ×オンザページグッズ購入シミュレーター</title>
+  <!-- html2canvas ライブラリの読み込み -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary: #4a8fff;
+      --accent: #e11d48;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 15px;
+      padding-bottom: 160px;
+    }
+    h1 { text-align: center; font-size: 1.3rem; color: var(--primary); margin-bottom: 15px; }
+    
+    .section-title {
+      background: var(--primary); color: white; padding: 8px 12px;
+      border-radius: 4px; margin-top: 20px; font-size: 0.95rem; font-weight: bold;
+    }
+    
+    .item-card {
+      background: var(--card-bg); border: 1px solid var(--border);
+      padding: 10px; border-radius: 6px; margin-top: 8px;
+    }
+    .item-main {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .item-info { flex: 1; }
+    .item-name { font-weight: bold; font-size: 0.85rem; }
+    .item-price { font-size: 0.8rem; color: #64748b; }
+    .counter { display: flex; align-items: center; gap: 6px; }
+    .counter button {
+      width: 28px; height: 28px; border: 1px solid #cbd5e1;
+      background: #fff; border-radius: 4px; font-weight: bold; cursor: pointer;
+    }
+    .counter input {
+      width: 36px; text-align: center; border: 1px solid #cbd5e1;
+      border-radius: 4px; padding: 4px;
+    }
+    
+    /* 選択トグル & エリア */
+    .char-toggle-btn {
+      margin-top: 5px; background: #f1f5f9; border: 1px solid var(--primary);
+      color: var(--primary); font-size: 0.75rem; padding: 4px 8px; border-radius: 4px;
+      cursor: pointer; font-weight: bold;
+    }
+    .char-list {
+      display: none; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #cbd5e1;
+    }
+    .char-list.open { display: grid; }
+    .char-item {
+      background: #f8fafc; padding: 6px; border-radius: 4px; border: 1px solid #e2e8f0;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .char-name-label { font-size: 0.75rem; font-weight: bold; }
+
+    .footer-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #0f172a; color: white; padding: 10px 20px 12px 20px;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+      z-index: 1000;
+    }
+    .footer-row { display: flex; justify-content: space-between; align-items: center; }
+    .footer-btns { display: flex; gap: 8px; align-items: center; }
+    .total-price-text { font-size: 1.2rem; font-weight: bold; }
+    .bonus-box {
+      margin-top: 6px; padding-top: 6px; border-top: 1px solid #334155;
+      display: flex; flex-direction: column; gap: 2px; font-size: 0.8rem; color: #fde047;
+    }
+    .next-bonus { font-size: 0.75rem; color: #94a3b8; }
+
+    /* かごボタン */
+    .cart-btn {
+      background: #4caf50; color: white; border: none; padding: 8px 14px;
+      font-size: 0.8rem; font-weight: bold; border-radius: 20px; cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    /* モーダル背景 */
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); z-index: 2000; justify-content: center; align-items: center;
+    }
+    .modal-overlay.open { display: flex; }
+
+    /* モーダル本体 */
+    .modal-content {
+      background: #fff; width: 90%; max-width: 500px; max-height: 80vh;
+      border-radius: 12px; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .modal-header {
+      background: var(--primary); color: white; padding: 12px 15px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .modal-header h2 { margin: 0; font-size: 1.1rem; }
+    .close-btn { background: none; border: none; color: white; font-size: 1.2rem; cursor: pointer; }
+
+    #cart-modal-body { padding: 15px; overflow-y: auto; flex: 1; }
+
+    /* かご内の各商品アイテム */
+    .cart-check-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px; border-bottom: 1px solid #eee; gap: 10px;
+    }
+    .cart-check-item.done {
+      background-color: #f0f0f0; opacity: 0.5;
+    }
+    .cart-check-item.done .cart-item-title {
+      text-decoration: line-through;
+    }
+    .cart-item-info { flex: 1; }
+    .cart-item-title { font-size: 0.9rem; font-weight: bold; }
+    .cart-item-sub { font-size: 0.8rem; color: #666; }
+
+    .cart-checkbox {
+      width: 22px; height: 22px; cursor: pointer;
+    }
+    .modal-footer {
+      padding: 10px; text-align: center; border-top: 1px solid #eee; background: #f9f9f9;
+    }
+    .close-modal-btn {
+      background: #666; color: white; border: none; padding: 8px 20px;
+      border-radius: 20px; font-weight: bold; cursor: pointer;
+    }
+
+    /* 各種ボタン */
+    .download-btn {
+      background: var(--accent); color: white; border: none; padding: 8px 14px;
+      font-size: 0.8rem; font-weight: bold; border-radius: 20px; cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .reset-btn {
+      background: #475569; color: white; border: none; padding: 8px 12px;
+      font-size: 0.8rem; font-weight: bold; border-radius: 20px; cursor: pointer;
+    }
+
+    /* 画像化用のサマリーカード */
+    #summary-card {
+      display: none; width: 500px; background: #ffffff; padding: 20px;
+      border-radius: 12px; border: 2px solid #1e293b;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #0f172a; position: absolute; top: -9999px; left: -9999px;
+    }
+    #summary-card h2 {
+      margin: 0 0 10px 0; font-size: 1.1rem; color: #1e293b;
+      text-align: center; border-bottom: 2px dashed #1e293b; padding-bottom: 8px;
+    }
+    .summary-group-hdr {
+      background: #1e293b; color: #fff; padding: 4px 8px; font-size: 0.85rem;
+      font-weight: bold; margin-top: 10px; border-radius: 3px;
+    }
+    .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+    .summary-table td { padding: 5px 6px; font-size: 0.8rem; border-bottom: 1px dashed #eee; }
+    .summary-table td.qty, .summary-table td.subtotal { text-align: right; }
+    
+    .summary-total-box {
+      background: #0f172a; color: #fff; padding: 12px 15px; border-radius: 8px; margin-top: 15px;
+    }
+    .summary-total-row { display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: bold; margin-bottom: 5px; }
+    .summary-bonus-row { display: flex; justify-content: space-between; font-size: 0.85rem; color: #fde047; border-top: 1px solid #334155; padding-top: 5px; }
+
+    /* 作成者情報エリア */
+    .creator {
+      margin-top: 30px;
+      padding: 12px 15px;
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: #555;
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    .creator-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .creator-link:hover { text-decoration: underline; }
+    .creator svg { width: 14px; height: 14px; fill: currentColor; }
+    .home-back { margin-top: 0; }
+    .home-link { color: #666; text-decoration: none; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+  <h1>スタンドマイヒーローズ×オンザページ　Wedding Promise<br>グッズ購入シミュレーター</h1>
+
+  <div class="section-title">【オープン／キャラ別：全26種】</div>
+  <div id="char-items"></div>
+
+  <div class="section-title">【オープン／所属別】</div>
+  <div id="dept-items"></div>
+
+  <div class="section-title">【オープン／1種】</div>
+  <div id="open-one-items"></div>
+
+  <div class="section-title">【コンプリートBOX】</div>
+  <div id="box-items"></div>
+
+  <div class="section-title">【ランダム】</div>
+  <div id="trade-items"></div>
+
+  <!-- 画像化用のサマリー要素 -->
+  <div id="summary-card">
+    <h2>スタマイ×オンザページ 購入リスト</h2>
+    <div id="summary-content"></div>
+    <div class="summary-total-box">
+      <div class="summary-total-row">
+        <span>合計金額</span>
+        <span id="summary-total-price">¥0</span>
+      </div>
+      <div class="summary-bonus-row">
+        <span>🎁 購入特典（2,000円ごと）</span>
+        <span><strong id="summary-bonus-count">0</strong> 枚</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- クリエイター情報エリア -->
+  <div class="creator">
+    <a 
+      href="https://twitter.com/intent/tweet?text=スタンドマイヒーローズ×オンザページ　Wedding Promiseのグッズ購入シミュレーターです！" 
+      target="_blank" 
+      rel="noopener" 
+      class="creator-link"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.244 2.25h3.308l-7.227 8.26L22.5 21.75h-6.594l-5.16-6.726-5.886 6.726H1.548l7.73-8.835L1.5 2.25h6.762l4.662 6.12 5.32-6.12Zm-1.16 17.52h1.833L7.62 4.125H5.655l11.43 15.645Z"/>
+      </svg>
+      <span>シェア</span>
+    </a>
+
+    <div>
+      作成者：
+      <a href="https://x.com/yLocal_trhk" target="_blank" rel="noopener" class="creator-link">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18.244 2.25h3.308l-7.227 8.26L22.5 21.75h-6.594l-5.16-6.726-5.886 6.726H1.548l7.73-8.835L1.5 2.25h6.762l4.662 6.12 5.32-6.12Zm-1.16 17.52h1.833L7.62 4.125H5.655l11.43 15.645Z"/>
+        </svg>
+        <span>@yLocal_trhk</span>
+      </a>
+    </div>
+
+    <div class="home-back">
+      <a href="https://ylocal-trhk.github.io/HOME/" class="home-link">
+        ← HOMEに戻る
+      </a>
+    </div>
+  </div>
+
+  <!-- フッター -->
+  <div class="footer-bar">
+    <div class="footer-row">
+      <div>
+        <span style="font-size:0.75rem; color:#94a3b8;">合計金額</span><br>
+        <span id="total-price" class="total-price-text">¥0</span>
+      </div>
+      <div class="footer-btns">
+        <button class="cart-btn" onclick="openCartModal()">List(<span id="cart-count">0</span>)</button>
+        <button class="reset-btn" onclick="resetAll()"> Reset</button>
+        <button class="download-btn" onclick="generateImage()">画像で保存</button>
+      </div>
+    </div>
+    <div class="bonus-box">
+      <div style="display: flex; justify-content: space-between;">
+        <span>🎁 OP2特典: <strong id="bonus-count">0</strong> 枚 <span id="next-bonus" class="next-bonus">（あと ¥2,000）</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 購入チェックリスト（ポップアップ） -->
+  <div id="cart-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🛒 購入チェックリスト</h2>
+        <button class="close-btn" onclick="closeCartModal()">✕</button>
+      </div>
+      <div id="cart-modal-body">
+        <!-- 選択された商品だけがここに動的生成されます -->
+      </div>
+      <div class="modal-footer">
+        <button class="close-modal-btn" onclick="closeCartModal()">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const STORAGE_KEY = 'stmy_op2_goods_selection';
+const CHECK_KEY = 'stmy_op2_checked_keys';
+let checkedItemKeys = new Set(JSON.parse(localStorage.getItem(CHECK_KEY) || '[]'));
+
+const charList = ["青山","由井","関","夏目","今大路","渡部","朝霧","菅野","荒木田","服部","桧山","大谷","神楽","槙","誠","京介","新堂","カナメ","桐嶋","九条","宮瀬","可愛","宝生","日向","早乙女","瀬尾"];
+const deptList = ["マトリ","警視庁","Revel","都築兄弟","九条家","瀬尾研究室"];
+
+const itemsData = {
+  chars: [
+    { name: "アクスタ", price: 1320 },
+    { name: "硬質カードケース", price: 880 },
+    { name: "席札風アクリルメモクリップ", price: 990 }
+  ],
+  dept: [{ name: "エンベロープケース", price: 1980 }],
+  openOne: [{ name: "カトラリー2本セット", price: 2640 }],
+  boxes: [
+    { name: "缶バッジA【マトリ・都築兄弟・九条家】", price: 7150 },
+    { name: "缶バッジB【警視庁・Revel・瀬尾研】", price: 7150 },
+    { name: "アンブレラマーカーA【マトリ・都築兄弟・九条家】", price: 8580 },
+    { name: "アンブレラマーカーB【警視庁・Revel・瀬尾研】", price: 8580 }
+  ],
+  trade: [
+    { name: "缶バッジA【マトリ・都築兄弟・九条家】", price: 550 },
+    { name: "缶バッジB【警視庁・Revel・瀬尾研】", price: 550 },
+    { name: "アンブレラマーカーA【マトリ・都築兄弟・九条家】", price: 660 },
+    { name: "アンブレラマーカーB【警視庁・Revel・瀬尾研】", price: 660 },
+    { name: "花びら型ステッカー（2枚入り）", price: 770 }
+  ]
+};
+
+function createItemCard(item, selectType='none', categoryKey='', index=0) {
+  let subListHtml = '', toggleBtnText = '';
+  if (selectType === 'char') {
+    toggleBtnText = 'キャラ別に選択 👤';
+    subListHtml = charList.map(c => `<div class="char-item">
+      <span class="char-name-label">${c}</span>
+      <div class="counter"><button onclick="updateQty(this,-1)">-</button>
+      <input type="number" value="0" min="0" data-category="${categoryKey}" data-name="${item.name}" data-sub="${c}" data-price="${item.price}" onchange="calculateTotal()">
+      <button onclick="updateQty(this,1)">+</button></div></div>`).join('');
+  } else if (selectType === 'dept') {
+    toggleBtnText = '所属別に選択 🏢';
+    subListHtml = deptList.map(d => `<div class="char-item">
+      <span class="char-name-label">${d}</span>
+      <div class="counter"><button onclick="updateQty(this,-1)">-</button>
+      <input type="number" value="0" min="0" data-category="${categoryKey}" data-name="${item.name}" data-sub="${d}" data-price="${item.price}" onchange="calculateTotal()">
+      <button onclick="updateQty(this,1)">+</button></div></div>`).join('');
+  }
+  const listId = `sub-list-${selectType}-${index}`;
+  if (selectType !== 'none') return `<div class="item-card"><div class="item-main"><div class="item-info">
+    <div class="item-name">${item.name}</div><div class="item-price">¥${item.price.toLocaleString()}</div></div>
+    <button class="char-toggle-btn" onclick="toggleSubList('${listId}')">${toggleBtnText}</button></div>
+    <div class="char-list" id="${listId}">${subListHtml}</div></div>`;
+  return `<div class="item-card"><div class="item-main"><div class="item-info">
+    <div class="item-name">${item.name}</div><div class="item-price">¥${item.price.toLocaleString()}</div></div>
+    <div class="counter"><button onclick="updateQty(this,-1)">-</button>
+    <input type="number" value="0" min="0" data-category="${categoryKey}" data-name="${item.name}" data-price="${item.price}" onchange="calculateTotal()">
+    <button onclick="updateQty(this,1)">+</button></div></div></div>`;
+}
+function toggleSubList(id) { document.getElementById(id).classList.toggle('open'); }
+function renderSection(id, items, type, category) {
+  document.getElementById(id).innerHTML = items.map((item,i)=>createItemCard(item,type,category,i)).join('');
+}
+function renderAll() {
+  renderSection('char-items',itemsData.chars,'char','オープン／キャラ別');
+  renderSection('dept-items',itemsData.dept,'dept','オープン／所属別');
+  renderSection('open-one-items',itemsData.openOne,'none','オープン／1種');
+  renderSection('box-items',itemsData.boxes,'none','コンプリートBOX');
+  renderSection('trade-items',itemsData.trade,'none','ランダム');
+}
+function updateQty(btn,change) {
+  const input=btn.parentElement.querySelector('input');
+  input.value=Math.max(0,(parseInt(input.value)||0)+change);
+  calculateTotal();
+}
+function getItemKey(input) {
+  return `${input.dataset.category||''}_${input.dataset.name||''}_${input.dataset.sub||''}`;
+}
+function saveSelections() {
+  const data={};
+  document.querySelectorAll('input[type="number"]').forEach(input=>{
+    const val=parseInt(input.value)||0;
+    if(val>0) data[getItemKey(input)]=val;
+  });
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(data));
+}
+function loadSelections() {
+  try {
+    const data=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}');
+    document.querySelectorAll('input[type="number"]').forEach(input=>{
+      const key=getItemKey(input);
+      if(data[key]!==undefined) {
+        input.value=data[key];
+        if(data[key]>0) { const list=input.closest('.char-list'); if(list) list.classList.add('open'); }
+      }
+    });
+  } catch(e) { console.error('復元エラー:',e); }
+}
+function resetAll() {
+  if(!confirm('選択した内容をすべてクリア（0にリセット）しますか？')) return;
+  document.querySelectorAll('input[type="number"]').forEach(input=>input.value=0);
+  document.querySelectorAll('.char-list.open').forEach(el=>el.classList.remove('open'));
+  localStorage.removeItem(STORAGE_KEY);
+  checkedItemKeys.clear(); localStorage.removeItem(CHECK_KEY);
+  calculateTotal();
+}
+function calculateTotal() {
+  let total=0, cartCount=0;
+  document.querySelectorAll('input[type="number"]').forEach(input=>{
+    const qty=parseInt(input.value)||0, price=parseInt(input.dataset.price)||0;
+    total+=qty*price; cartCount+=qty;
+  });
+  document.getElementById('total-price').innerText=`¥${total.toLocaleString()}`;
+  document.getElementById('cart-count').innerText=cartCount;
+  const unit=2000, bonus=Math.floor(total/unit), remainder=total%unit;
+  document.getElementById('bonus-count').innerText=bonus;
+  document.getElementById('next-bonus').innerText=total===0?'（あと ¥2,000）':remainder===0?'（達成！🎉）':`（あと ¥${(unit-remainder).toLocaleString()}）`;
+  saveSelections();
+}
+function openCartModal() {
+  const body=document.getElementById('cart-modal-body'); body.innerHTML='';
+  let hasItem=false, count=0;
+  document.querySelectorAll('input[type="number"]').forEach(input=>{
+    const qty=parseInt(input.value)||0; if(qty<=0)return;
+    hasItem=true; count+=qty;
+    const key=getItemKey(input), name=input.dataset.name||'', sub=input.dataset.sub||'', price=parseInt(input.dataset.price)||0;
+    const fullName=sub?`${name} [${sub}]`:name, isChecked=checkedItemKeys.has(key);
+    const row=document.createElement('div'); row.className=`cart-check-item ${isChecked?'done':''}`;
+    row.innerHTML=`<input type="checkbox" class="cart-checkbox" ${isChecked?'checked':''}>
+      <div class="cart-item-info"><div class="cart-item-title">${fullName}</div>
+      <div class="cart-item-sub">¥${price.toLocaleString()} × ${qty}個 = ¥${(price*qty).toLocaleString()}</div></div>`;
+    row.querySelector('input').addEventListener('change',e=>{
+      if(e.target.checked){checkedItemKeys.add(key);row.classList.add('done');}
+      else {checkedItemKeys.delete(key);row.classList.remove('done');}
+      localStorage.setItem(CHECK_KEY,JSON.stringify([...checkedItemKeys]));
+    });
+    body.appendChild(row);
+  });
+  document.getElementById('cart-count').innerText=count;
+  if(!hasItem) body.innerHTML='<div style="text-align:center;color:#888;padding:30px 0;">かごに商品が入っていません</div>';
+  document.getElementById('cart-modal').classList.add('open');
+}
+function closeCartModal(){document.getElementById('cart-modal').classList.remove('open');}
+function generateImage() {
+  const grouped={}, allInputs=[...document.querySelectorAll('input[type="number"]')]; let total=0;
+  allInputs.forEach(input=>{
+    const qty=parseInt(input.value)||0; if(qty<=0)return;
+    const category=input.dataset.category, name=input.dataset.name, sub=input.dataset.sub||'', price=parseInt(input.dataset.price)||0;
+    const fullName=sub?`${name} [${sub}]`:name;
+    if(!grouped[category])grouped[category]=[];
+    grouped[category].push({name:fullName,qty,subtotal:qty*price}); total+=qty*price;
+  });
+  if(!Object.keys(grouped).length){alert('商品が1つも選択されていません。');return;}
+  const content=document.getElementById('summary-content'); content.innerHTML='';
+  for(const [category,items] of Object.entries(grouped)){
+    const hdr=document.createElement('div');hdr.className='summary-group-hdr';hdr.innerText=category;content.appendChild(hdr);
+    const table=document.createElement('table');table.className='summary-table';
+    table.innerHTML=items.map(item=>`<tr><td>${item.name}</td><td class="qty" style="width:40px;">${item.qty}</td><td class="subtotal" style="width:70px;">¥${item.subtotal.toLocaleString()}</td></tr>`).join('');
+    content.appendChild(table);
+  }
+  document.getElementById('summary-total-price').innerText=`¥${total.toLocaleString()}`;
+  document.getElementById('summary-bonus-count').innerText=Math.floor(total/2000);
+  const card=document.getElementById('summary-card');card.style.display='block';
+  html2canvas(card,{scale:2}).then(canvas=>{
+    card.style.display='none';const link=document.createElement('a');
+    link.download='スタマイ×オンザページ.png';link.href=canvas.toDataURL('image/png');link.click();
+  }).catch(()=>{card.style.display='none';alert('画像の作成に失敗しました。');});
+}
+renderAll(); loadSelections(); calculateTotal();
+</script>
+</body>
+</html>
